@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title_suffix %} — Trade History{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-white">Trade History</h1>
+  <p class="text-gray-400 text-sm mt-1">All paper trades executed by the S4 strategy</p>
+</div>
+
+<!-- Summary Cards -->
+<div class="grid grid-cols-5 gap-4 mb-6">
+  <div class="card">
+    <div class="text-gray-400 text-xs mb-1">Total Trades</div>
+    <div class="text-xl font-bold text-white">{{ total_trades }}</div>
+  </div>
+  <div class="card">
+    <div class="text-gray-400 text-xs mb-1">Buys</div>
+    <div class="text-xl font-bold text-green-400">{{ total_buys }}</div>
+  </div>
+  <div class="card">
+    <div class="text-gray-400 text-xs mb-1">Sells</div>
+    <div class="text-xl font-bold text-red-400">{{ total_sells }}</div>
+  </div>
+  <div class="card">
+    <div class="text-gray-400 text-xs mb-1">Total Turnover</div>
+    <div class="text-lg font-bold text-white">₹{{ total_turnover_str }}</div>
+  </div>
+  <div class="card">
+    <div class="text-gray-400 text-xs mb-1">Total Commission</div>
+    <div class="text-lg font-bold text-yellow-400">₹{{ total_commission_str }}</div>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+  <div class="flex gap-4 items-center">
+    <input id="filterTicker" type="text" placeholder="Search ticker…"
+           oninput="filterTable()"
+           class="bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-1.5 text-sm w-40 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+    <select id="filterAction" onchange="filterTable()"
+            class="bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500">
+      <option value="">All Actions</option>
+      <option value="BUY">BUY</option>
+      <option value="SELL">SELL</option>
+    </select>
+    <select id="filterRegime" onchange="filterTable()"
+            class="bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500">
+      <option value="">All Regimes</option>
+      <option value="BULL">BULL</option>
+      <option value="NEUTRAL">NEUTRAL</option>
+      <option value="BEAR">BEAR</option>
+    </select>
+    <button onclick="clearFilters()"
+            class="text-xs text-gray-400 hover:text-white underline">Clear</button>
+    <span id="rowCount" class="ml-auto text-gray-400 text-sm"></span>
+  </div>
+</div>
+
+<!-- Trade Table -->
+<div class="card overflow-x-auto">
+  <table class="w-full text-sm" id="tradeTable">
+    <thead>
+      <tr class="text-gray-400 border-b border-gray-700">
+        <th class="text-left pb-2 pr-4">Date</th>
+        <th class="text-left pb-2 pr-4">Ticker</th>
+        <th class="text-center pb-2 pr-4">Action</th>
+        <th class="text-right pb-2 pr-4">Qty</th>
+        <th class="text-right pb-2 pr-4">Price</th>
+        <th class="text-right pb-2 pr-4">Value</th>
+        <th class="text-right pb-2 pr-4">Commission</th>
+        <th class="text-center pb-2">Regime</th>
+      </tr>
+    </thead>
+    <tbody id="tradeBody">
+      {% for t in trades %}
+      <tr class="border-b border-gray-700/50 hover:bg-gray-700/30 trade-row"
+          data-ticker="{{ t.Ticker|upper }}"
+          data-action="{{ t.Action|upper }}"
+          data-regime="{{ t.Regime|upper }}">
+        <td class="py-2 pr-4 text-gray-300">{{ t.Date }}</td>
+        <td class="py-2 pr-4 font-semibold text-white">{{ t.Ticker }}</td>
+        <td class="py-2 pr-4 text-center">
+          {% if t.Action == 'BUY' %}
+            <span class="badge-bull">BUY</span>
+          {% else %}
+            <span class="badge-bear">SELL</span>
+          {% endif %}
+        </td>
+        <td class="py-2 pr-4 text-right text-gray-300">{{ t.Qty }}</td>
+        <td class="py-2 pr-4 text-right text-gray-300">₹{{ t.Price }}</td>
+        <td class="py-2 pr-4 text-right text-white">₹{{ t.Value|int }}</td>
+        <td class="py-2 pr-4 text-right text-yellow-400">₹{{ t.Commission|round(0)|int }}</td>
+        <td class="py-2 text-center">
+          {% if t.Regime == 'BULL' %}
+            <span class="badge-bull">{{ t.Regime }}</span>
+          {% elif t.Regime == 'BEAR' %}
+            <span class="badge-bear">{{ t.Regime }}</span>
+          {% else %}
+            <span class="badge-neutral">{{ t.Regime }}</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr id="emptyRow">
+        <td colspan="8" class="py-8 text-center text-gray-500">
+          No trades yet. Go to <a href="/rebalance" class="text-indigo-400 underline">Rebalance</a> to execute your first trade.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterTable() {
+  const tickerQ  = document.getElementById('filterTicker').value.toUpperCase();
+  const actionQ  = document.getElementById('filterAction').value.toUpperCase();
+  const regimeQ  = document.getElementById('filterRegime').value.toUpperCase();
+  const rows     = document.querySelectorAll('.trade-row');
+  let visible    = 0;
+
+  rows.forEach(row => {
+    const ticker  = (row.dataset.ticker  || '').toUpperCase();
+    const action  = (row.dataset.action  || '').toUpperCase();
+    const regime  = (row.dataset.regime  || '').toUpperCase();
+
+    const match =
+      (!tickerQ || ticker.includes(tickerQ)) &&
+      (!actionQ || action === actionQ) &&
+      (!regimeQ || regime === regimeQ);
+
+    row.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+
+  document.getElementById('rowCount').textContent = `${visible} of ${rows.length} trades`;
+}
+
+function clearFilters() {
+  document.getElementById('filterTicker').value = '';
+  document.getElementById('filterAction').value = '';
+  document.getElementById('filterRegime').value = '';
+  filterTable();
+}
+
+// Initial count
+filterTable();
+</script>
+{% endblock %}
