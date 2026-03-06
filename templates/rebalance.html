@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+{% block title_suffix %} — Rebalance{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-white">Rebalance Wizard</h1>
+  <p class="text-gray-400 text-sm mt-1">Generate fresh signals and execute trades in one flow</p>
+</div>
+
+<!-- Progress Steps -->
+<div class="card mb-6">
+  <div class="flex items-center justify-between">
+    {% for step in [('1','Fetch Data'),('2','Detect Regime'),('3','Generate Signals'),('4','Review Trades'),('5','Execute')] %}
+    <div class="flex flex-col items-center flex-1" id="step{{ loop.index }}_wrap">
+      <div id="step{{ loop.index }}"
+           class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm
+                  bg-gray-700 text-gray-400 transition-all">
+        {{ step[0] }}
+      </div>
+      <div class="text-xs text-gray-400 mt-1 text-center">{{ step[1] }}</div>
+    </div>
+    {% if not loop.last %}
+    <div class="h-0.5 flex-1 bg-gray-700 mx-2 -mt-4" id="connector{{ loop.index }}"></div>
+    {% endif %}
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Status / Progress area -->
+<div id="statusArea" class="card mb-6 hidden">
+  <div class="flex items-center gap-3">
+    <div id="spinner" class="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin hidden"></div>
+    <span id="statusMsg" class="text-gray-300 text-sm"></span>
+  </div>
+</div>
+
+<!-- Start button -->
+<div id="startArea" class="mb-6">
+  <button onclick="startRebalance()"
+          class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition text-sm">
+    🚀 Start Rebalance
+  </button>
+</div>
+
+<!-- Trade Plan (hidden until signals ready) -->
+<div id="tradePlanArea" class="hidden">
+  <div class="grid grid-cols-2 gap-6 mb-6">
+    <!-- Sells -->
+    <div class="card">
+      <h3 class="font-semibold text-white mb-3 flex items-center gap-2">
+        <span class="text-red-400">↓</span> Sells / Exits
+        <span id="sellCount" class="ml-auto text-xs bg-red-900 text-red-300 px-2 py-0.5 rounded">0</span>
+      </h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-gray-400 border-b border-gray-700">
+              <th class="text-left pb-2">Ticker</th>
+              <th class="text-center pb-2">Action</th>
+              <th class="text-right pb-2">Qty</th>
+              <th class="text-right pb-2">Price</th>
+              <th class="text-right pb-2">Value</th>
+            </tr>
+          </thead>
+          <tbody id="sellsTable">
+            <tr><td colspan="5" class="py-4 text-center text-gray-500">No sells</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <!-- Buys -->
+    <div class="card">
+      <h3 class="font-semibold text-white mb-3 flex items-center gap-2">
+        <span class="text-green-400">↑</span> Buys / Adds
+        <span id="buyCount" class="ml-auto text-xs bg-green-900 text-green-300 px-2 py-0.5 rounded">0</span>
+      </h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-gray-400 border-b border-gray-700">
+              <th class="text-left pb-2">Ticker</th>
+              <th class="text-center pb-2">Action</th>
+              <th class="text-right pb-2">Qty</th>
+              <th class="text-right pb-2">Price</th>
+              <th class="text-right pb-2">Value</th>
+            </tr>
+          </thead>
+          <tbody id="buysTable">
+            <tr><td colspan="5" class="py-4 text-center text-gray-500">No buys</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary + Execute -->
+  <div class="card mb-6">
+    <div class="grid grid-cols-4 gap-4 mb-4">
+      <div>
+        <div class="text-gray-400 text-xs">Regime</div>
+        <div id="summaryRegime" class="font-bold text-white mt-0.5">—</div>
+      </div>
+      <div>
+        <div class="text-gray-400 text-xs">Turnover</div>
+        <div id="summaryTurnover" class="font-bold text-white mt-0.5">—</div>
+      </div>
+      <div>
+        <div class="text-gray-400 text-xs">Est. Commission</div>
+        <div id="summaryCommission" class="font-bold text-yellow-400 mt-0.5">—</div>
+      </div>
+      <div>
+        <div class="text-gray-400 text-xs">Holdings After</div>
+        <div id="summaryHoldings" class="font-bold text-white mt-0.5">—</div>
+      </div>
+    </div>
+    <button id="executeBtn" onclick="executeTrades()"
+            class="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition text-sm">
+      ✓ Execute All Trades
+    </button>
+  </div>
+</div>
+
+<!-- Success message -->
+<div id="successArea" class="hidden card border border-green-700 bg-green-900/20">
+  <div class="text-green-400 font-bold text-lg mb-1">✓ Trades Executed Successfully!</div>
+  <div id="successMsg" class="text-gray-300 text-sm"></div>
+  <div class="mt-4">
+    <a href="/" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition">
+      → Go to Dashboard
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentSignals = null;
+
+function setStep(n, state) {
+  // state: 'active' | 'done' | 'idle'
+  const el = document.getElementById('step' + n);
+  if (!el) return;
+  el.className = 'w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm transition-all ';
+  if (state === 'done')   el.className += 'bg-green-600 text-white';
+  else if (state === 'active') el.className += 'bg-indigo-600 text-white ring-2 ring-indigo-300';
+  else                    el.className += 'bg-gray-700 text-gray-400';
+}
+
+function showStatus(msg, spin=false) {
+  const area = document.getElementById('statusArea');
+  area.classList.remove('hidden');
+  document.getElementById('statusMsg').textContent = msg;
+  const spinner = document.getElementById('spinner');
+  if (spin) spinner.classList.remove('hidden');
+  else spinner.classList.add('hidden');
+}
+
+function formatIndian(num) {
+  const s = String(Math.abs(Math.round(num)));
+  if (s.length <= 3) return (num < 0 ? '-' : '') + s;
+  let result = s.slice(-3);
+  let rest = s.slice(0, -3);
+  while (rest.length > 0) {
+    result = rest.slice(-2) + ',' + result;
+    rest = rest.slice(0, -2);
+  }
+  return (num < 0 ? '-' : '') + result;
+}
+
+async function startRebalance() {
+  document.getElementById('startArea').classList.add('hidden');
+  showStatus('Starting signal generation…', true);
+  setStep(1, 'active');
+
+  try {
+    await fetch('/api/generate-signals', { method: 'POST' });
+    pollStatus();
+  } catch(e) {
+    showStatus('❌ Network error: ' + e.message);
+  }
+}
+
+async function pollStatus() {
+  try {
+    const res  = await fetch('/api/status');
+    const data = await res.json();
+
+    if (data.status === 'running') {
+      showStatus(data.progress || 'Running…', true);
+      setStep(1, 'done'); setStep(2, 'active');
+      setTimeout(pollStatus, 2000);
+    } else if (data.status === 'complete') {
+      setStep(1, 'done'); setStep(2, 'done');
+      setStep(3, 'done'); setStep(4, 'active');
+      showStatus('✓ Signals generated. Preparing trade plan…');
+      currentSignals = data.signals;
+      renderTradePlan(data.signals, data.details || []);
+    } else if (data.status === 'error') {
+      showStatus('❌ Error: ' + (data.error || 'Unknown error'));
+    } else {
+      setTimeout(pollStatus, 2000);
+    }
+  } catch(e) {
+    showStatus('❌ Polling error: ' + e.message);
+    setTimeout(pollStatus, 3000);
+  }
+}
+
+function renderTradePlan(signals, details) {
+  document.getElementById('tradePlanArea').classList.remove('hidden');
+
+  const holdings = signals.holdings || {};
+  const tickers  = Object.keys(holdings);
+
+  // We'll compute sells/buys client-side for display (server will do actual compute)
+  // For now, just show the target holdings as "buys"
+  const buysBody = document.getElementById('buysTable');
+  buysBody.innerHTML = '';
+  let totalTurnover = 0;
+
+  details.forEach(d => {
+    const val = d.qty * d.price;
+    totalTurnover += val;
+    buysBody.innerHTML += `
+      <tr class="border-b border-gray-700/50">
+        <td class="py-1.5 font-medium text-white">${d.ticker}</td>
+        <td class="py-1.5 text-center"><span class="badge-bull text-xs">NEW</span></td>
+        <td class="py-1.5 text-right text-gray-300">${d.qty}</td>
+        <td class="py-1.5 text-right text-gray-300">₹${d.price.toFixed(2)}</td>
+        <td class="py-1.5 text-right text-white">₹${formatIndian(val)}</td>
+      </tr>`;
+  });
+
+  document.getElementById('buyCount').textContent = details.length;
+  document.getElementById('sellCount').textContent = '0';
+  document.getElementById('sellsTable').innerHTML =
+    '<tr><td colspan="5" class="py-4 text-center text-gray-500">No sells on first rebalance</td></tr>';
+
+  document.getElementById('summaryRegime').textContent     = signals.regime;
+  document.getElementById('summaryTurnover').textContent   = '₹' + formatIndian(totalTurnover);
+  const commission = totalTurnover * 0.00148 * 2;
+  document.getElementById('summaryCommission').textContent = '₹' + formatIndian(commission);
+  document.getElementById('summaryHoldings').textContent   = tickers.length + ' stocks';
+}
+
+async function executeTrades() {
+  document.getElementById('executeBtn').disabled = true;
+  document.getElementById('executeBtn').textContent = 'Executing…';
+  setStep(5, 'active');
+  showStatus('Executing trades…', true);
+
+  try {
+    const res  = await fetch('/api/execute-trades', { method: 'POST' });
+    const data = await res.json();
+    if (data.status === 'success') {
+      setStep(5, 'done');
+      showStatus('✓ Done!');
+      document.getElementById('tradePlanArea').classList.add('hidden');
+      document.getElementById('successArea').classList.remove('hidden');
+      document.getElementById('successMsg').textContent =
+        `${data.trades_executed} trades executed · Portfolio value: ₹${formatIndian(data.portfolio_value)}`;
+    } else {
+      showStatus('❌ Error: ' + (data.message || 'Unknown'));
+      document.getElementById('executeBtn').disabled = false;
+      document.getElementById('executeBtn').textContent = '✓ Execute All Trades';
+    }
+  } catch(e) {
+    showStatus('❌ Network error: ' + e.message);
+    document.getElementById('executeBtn').disabled = false;
+    document.getElementById('executeBtn').textContent = '✓ Execute All Trades';
+  }
+}
+</script>
+{% endblock %}

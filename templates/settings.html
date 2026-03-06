@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title_suffix %} — Settings{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-white">Settings</h1>
+  <p class="text-gray-400 text-sm mt-1">Configure the S4 strategy parameters</p>
+</div>
+
+<form method="POST" action="/update_settings" class="space-y-6 max-w-2xl">
+
+  <!-- Capital & Fees -->
+  <div class="card">
+    <h2 class="font-semibold text-white mb-4 text-base">💰 Capital &amp; Fees</h2>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm text-gray-400 mb-1">Starting Capital (₹)</label>
+        <input type="number" name="starting_capital" value="{{ config.starting_capital }}"
+               class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label class="block text-sm text-gray-400 mb-1">Commission (per side, e.g. 0.00148)</label>
+        <input type="number" name="commission" value="{{ config.commission }}" step="0.00001"
+               class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label class="block text-sm text-gray-400 mb-1">Max Weight per Stock</label>
+        <input type="number" name="max_weight" value="{{ config.max_weight }}" step="0.01"
+               class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label class="block text-sm text-gray-400 mb-1">Min Stocks in Portfolio</label>
+        <input type="number" name="min_stocks" value="{{ config.min_stocks }}"
+               class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Kill Switches -->
+  <div class="card border border-red-800">
+    <h2 class="font-semibold text-red-400 mb-4 text-base">🛑 Safety Kill Switches</h2>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm text-gray-400 mb-1">Warning Drawdown % (e.g. -20)</label>
+        <input type="number" name="warning_dd" value="{{ config.warning_dd }}" step="0.5"
+               class="w-full bg-gray-700 border border-red-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-red-500" />
+      </div>
+      <div>
+        <label class="block text-sm text-gray-400 mb-1">Hard Stop Drawdown % (e.g. -30)</label>
+        <input type="number" name="hard_stop_dd" value="{{ config.hard_stop_dd }}" step="0.5"
+               class="w-full bg-gray-700 border border-red-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-red-500" />
+      </div>
+    </div>
+    <p class="text-gray-500 text-xs mt-2">Dashboard pulsates red when drawdown crosses warning level.</p>
+  </div>
+
+  <!-- Strategy Parameters -->
+  <div class="card">
+    <h2 class="font-semibold text-white mb-4 text-base">📐 Strategy Parameters</h2>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm text-gray-400 mb-1">Momentum Lookback (days)</label>
+        <input type="number" name="mom_lookback" value="{{ config.mom_lookback }}"
+               class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label class="block text-sm text-gray-400 mb-1">SMA Trend Filter (days)</label>
+        <input type="number" name="sma_trend" value="{{ config.sma_trend }}"
+               class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label class="block text-sm text-gray-400 mb-1">Breadth SMA (days)</label>
+        <input type="number" name="breadth_sma" value="{{ config.breadth_sma }}"
+               class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label class="block text-sm text-gray-400 mb-1">Bull Breadth Threshold</label>
+        <input type="number" name="bull_breadth" value="{{ config.bull_breadth }}" step="0.01"
+               class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label class="block text-sm text-gray-400 mb-1">Bear Breadth Threshold</label>
+        <input type="number" name="bear_breadth" value="{{ config.bear_breadth }}" step="0.01"
+               class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label class="block text-sm text-gray-400 mb-1">52W High Proximity</label>
+        <input type="number" name="hi52_prox" value="{{ config.hi52_prox }}" step="0.01"
+               class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Save -->
+  <div class="flex gap-3">
+    <button type="submit"
+            class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition text-sm">
+      💾 Save Settings
+    </button>
+    <a href="/settings"
+       class="px-6 py-2.5 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition text-sm">
+      ✗ Cancel
+    </a>
+  </div>
+
+</form>
+
+{% if request.args.get('saved') %}
+<div class="mt-4 text-green-400 text-sm">✓ Settings saved successfully.</div>
+{% endif %}
+{% endblock %}
